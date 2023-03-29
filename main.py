@@ -5,6 +5,7 @@ import logging
 from botocore.exceptions import ClientError
 from boto3.s3.transfer import TransferConfig
 import argparse
+import json
 parser = argparse.ArgumentParser()
 parser.add_argument('--bucket_name', "-bn", type=str, help='Name of S3 bucket')
 parser.add_argument('--url', type=str, help='link to download file')
@@ -14,6 +15,11 @@ parser.add_argument('--filepath', "-fp", type=str, help='file path for upload')
 parser.add_argument('--multipart_threshold', "-mth", type=int, default=5 * 1024 * 1024 * 1024, help='Multipart threshold in bytes (default: 5GB)')
 parser.add_argument('--days', '-d', type=int, help='number of days when object will be deleted')
 parser.add_argument('--memetype', '-mt', type=str, help='memetype which is allowed to upload')
+parser.add_argument('-del', dest='delete', action='store_true', help='Delete the file')
+parser.add_argument('-vers', dest='versioning', action='store_true', help='check versioning')
+parser.add_argument('-verslist', dest='versionlist', action='store_true', help='version list')
+parser.add_argument('-prevers', dest='previous_version', action='store_true', help='roll back to previous version')
+parser.add_argument('-orgobj', dest='Organize_objects', action='store_true', help='put files in folder according extention type')
 args = parser.parse_args()
 s3 = boto3.client('s3')
 from hashlib import md5
@@ -202,6 +208,69 @@ def big_file_upload(s3_client, bucketname, file_name, filepath, multipart_thresh
         object_key = args.file_name or args.filepath.split('/')[-1]
         s3_client.upload_fileobj(f, args.bucket_name, object_key, Config=config)
     print(f'{args.file_name} აიტვირთა წარმატებით')
+def list_objects(s3_client, bucket_name):
+    response = s3_client.list_objects(Bucket=args.bucket_name)
+    for obj in response['Contents']:
+        print(obj['Key'])
+def previous_version(s3_client, bucket_name, file_name):
+    try:
+        response = s3_client.get_object(Bucket=args.bucket_name, Key=args.file_name)
+        latest_version_id = response['VersionId']
+        response = s3_client.list_object_versions(Bucket=args.bucket_name, Prefix=args.file_name)
+        previous_version_id = response['Versions'][1]['VersionId']
+        response = s3_client.copy_object(
+            Bucket=args.bucket_name,
+            Key=args.file_name,
+            CopySource={'Bucket': args.bucket_name, 'Key': args.file_name, 'VersionId': previous_version_id})
+        print(f'{args.file_name} ფაილი დაუბრუნდა წინა ვერსიას')
+    except:
+        print(f'{args.file_name} ფაილის წინა ვერსიაზე ვერ დაბრუნდა')
+def version_list(s3_client, bucket_name, file_name):
+    response = s3_client.list_object_versions(Bucket=args.bucket_name, Prefix=args.file_name)
+    num_versions = len(response['Versions'])
+    dates = [v['LastModified'] for v in response['Versions']]
+    print(f'Bucket name: {args.bucket_name}')
+    print(f'File name: {args.file_name}')
+    print(f'Number of versions: {num_versions}')
+    print('Creation dates of versions:')
+    for date in dates:
+        print(date)
+def versioning(s3_client, bucket_name):
+    output = s3_client.get_bucket_versioning(Bucket=args.bucket_name,)
+    try:
+        status = output['Status']
+        print(f'ბაკეტზე {args.bucket_name} ვერსიონირება ჩართლია')
+    except:
+        print(f'ბაკეტზე {args.bucket_name} ვერსიონირება არ არის ჩართული')
+def delete_file(s3_client, bucket_name, filename):
+    response = s3_client.delete_object(Bucket=args.bucket_name, Key=args.file_name)
+    print(f'{args.file_name} ფაილი წაიშალა')
+def Organize_objects(s3_client, bucket_name):
+    counter = {}
+    response = s3_client.list_objects_v2(Bucket=args.bucket_name)
+    if response is not None:
+        contents = response.get('Contents', [])
+        for obj in contents:
+            key = obj['Key']
+            if '.' in key:
+                extension_name = key.split(".")[-1]
+                if not counter.get(extension_name):
+                    counter[extension_name] = 1
+                    destination_key = extension_name + '/' + key
+                    s3_client.put_object(Bucket=args.bucket_name, Key=extension_name+'/')
+                    s3_client.copy_object(Bucket=args.bucket_name, CopySource={'Bucket': args.bucket_name, 'Key': key}, Key=destination_key)
+                    s3_client.delete_object(Bucket=args.bucket_name, Key=key)
+                else:
+                    counter[extension_name] += 1
+                    destination_key = extension_name + '/' + key
+                    s3_client.copy_object(Bucket=args.bucket_name, CopySource={'Bucket': args.bucket_name, 'Key': key}, Key=destination_key)
+                    s3_client.delete_object(Bucket=args.bucket_name, Key=key)
+
+    else:
+        print('Response is None')
+    print(counter)
+    
+
 if __name__ == "__main__":
     s3_client = init_client()
 if args.tool == 'init_client' or args.tool == 'ic':
@@ -267,3 +336,15 @@ if args.tool == 'big_file_upload' or args.tool == 'bfu':
         big_file_upload(s3_client, args.bucket_name, args.file_name, args.filepath, args.multipart_threshold)
     else:
         print(f'{meme} გაფართების მქონე ფაილის ატვირთვა არ არის ნებადართული')
+if args.tool == list_objects or args.tool =='lo':
+    list_objects(s3_client, args.bucket_name)
+if args.delete == True:
+    delete_file(s3_client, args.bucket_name, args.file_name)
+if args.versioning == True:
+    versioning(s3_client, args.bucket_name)
+if args.versionlist == True:
+    version_list(s3_client, args.bucket_name, args.file_name)
+if args.previous_version == True:
+    previous_version(s3_client, args.bucket_name, args.file_name)
+if args.Organize_objects == True:
+    Organize_objects(s3_client, args.bucket_name)

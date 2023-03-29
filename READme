@@ -12,3 +12,9 @@ upload file to s3 bucket  : python main.py --t u(upload) -bn(--bucket_name) test
 upload big file to s3 bucket : python main.py -t bfu(big_file_upload) -bn(--bucket_name) bucketname -fn(--file_name) filename -fp(--filepath) filepath
  -mth(--multipart_threshold) size
 create lifecycle policy : python main.py -t lc(or lifecycle) -bn(--backetname) bucketname -d(--days) number of days
+list objects : python main.py -t lo -bn bucketname
+check bucket's versioning status : python main.py -bn bucketname -vers
+see files version number and version date : python main.py -bn bucketname -fn filename -verslist
+roll back file previous version : python main.py -bn bucketname -fn filename -prevers
+delete file : python main.py -bn bucketname -fn filename -del
+put files in folder according extention type : python main.py -bn bucketname -orgobj
