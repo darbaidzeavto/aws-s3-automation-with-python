@@ -3,18 +3,23 @@ from os import getenv
 from dotenv import load_dotenv
 import logging
 from botocore.exceptions import ClientError
+from boto3.s3.transfer import TransferConfig
 import argparse
 parser = argparse.ArgumentParser()
-parser.add_argument('--bucket_name', type=str)
-parser.add_argument('--url', type=str)
-parser.add_argument('--file_name', type=str)
-parser.add_argument('--tool', type=str)
+parser.add_argument('--bucket_name', "-bn", type=str, help='Name of S3 bucket')
+parser.add_argument('--url', type=str, help='link to download file')
+parser.add_argument('--file_name', "-fn", type=str, help='uploaded file name')
+parser.add_argument('--tool', '-t', type=str, help='choose function')
+parser.add_argument('--filepath', "-fp", type=str, help='file path for upload')
+parser.add_argument('--multipart_threshold', "-mth", type=int, default=5 * 1024 * 1024 * 1024, help='Multipart threshold in bytes (default: 5GB)')
+parser.add_argument('--days', '-d', type=int, help='number of days when object will be deleted')
+parser.add_argument('--memetype', '-mt', type=str, help='memetype which is allowed to upload')
 args = parser.parse_args()
 s3 = boto3.client('s3')
 from hashlib import md5
 from time import localtime 
 load_dotenv()
- 
+s3 = boto3.client('s3')
 def init_client():
     try:
         client = boto3.client("s3",
@@ -31,9 +36,6 @@ def init_client():
                               #          "max_attempts": conf.remote_cfg["remote_retries"]}
                               )
         # check if credentials are correct
-        init= client.list_buckets()
-        print(init)
- 
         return client
     except ClientError as e:
         logging.error(e)
@@ -175,17 +177,41 @@ def read_bucket_policy(s3_client, bucket_name):
     except ClientError as e:
         logging.error(e)
         return False
- 
+def upload_file(s3_client, bucket_name, file_name, filepath):
+    with open(args.filepath, 'rb') as f:
+        s3_client.upload_fileobj(f, args.bucket_name, args.file_name)
+    print(f'{args.file_name} ფაილი აიტვირთა წარმატებით')
+def lifecycle(s3_client, bucket_name , days):
+    lifecycle_config = {
+        'Rules': [
+            {
+                'ID': 'Delete after {} days'.format(args.days),
+                'Status': 'Enabled',
+                'Prefix': '',
+                'Expiration': {
+                    'Days': args.days
+                }
+            }
+        ]
+    }
+    s3_client.put_bucket_lifecycle_configuration(Bucket=args.bucket_name, LifecycleConfiguration=lifecycle_config)
+    print(f'ბაკეტი {args.bucket_name} წაიშლება {args.days} დღეში ')
+def big_file_upload(s3_client, bucketname, file_name, filepath, multipart_threshold):
+    config = TransferConfig(multipart_threshold=args.multipart_threshold)
+    with open(args.filepath, 'rb') as f:
+        object_key = args.file_name or args.filepath.split('/')[-1]
+        s3_client.upload_fileobj(f, args.bucket_name, object_key, Config=config)
+    print(f'{args.file_name} აიტვირთა წარმატებით')
 if __name__ == "__main__":
     s3_client = init_client()
-if args.tool == 'init_client':
+if args.tool == 'init_client' or args.tool == 'ic':
     init_client()
-if args.tool == 'list_bucket':
+if args.tool == 'list_bucket' or args.tool == 'lb':
     buckets = list_buckets(s3_client)
     if buckets:
         for bucket in buckets['Buckets']:
             print(f'  {bucket["Name"]}')
-if args.tool == 'create_bucket':
+if args.tool == 'create_bucket' or args.tool == 'cb':
     response = s3_client.list_buckets()
     for bucket in response['Buckets']:
         if bucket['Name'] == args.bucket_name:
@@ -194,7 +220,7 @@ if args.tool == 'create_bucket':
     else:
         s3_client.create_bucket(Bucket=args.bucket_name)
         print(f'bucket {args.bucket_name} შეიქმნა.')
-if args.tool == 'delete_bucket':
+if args.tool == 'delete_bucket' or args.tool == 'db':
     response = s3_client.list_buckets()
     for bucket in response['Buckets']:
         if bucket['Name'] == args.bucket_name:
@@ -203,29 +229,41 @@ if args.tool == 'delete_bucket':
             break
     else:
       print(f'bucket {args.bucket_name} არ არსებობს.')
-if args.tool == 'bucket_exists':
+if args.tool == 'bucket_exists' or args.tool == 'be':
     try:
         bucket_exists(s3_client, args.bucket_name)
         print(f'The bucket {args.bucket_name} არსებობს.')
     except:
         print(f'The bucket {args.bucket_name} არ არსებობს')  
-if args.tool == 'set_object_access_policy':
+if args.tool == 'set_object_access_policy' or args.tool == 'soap':
     try:
         set_object_access_policy(s3_client, args.bucket_name, args.file_name)
         print("object access policy დაემატა წარმატებით")
     except:
         print("object access policy ვერ დაემატა")
-if args.tool == 'generate_public_read_policy':
+if args.tool == 'generate_public_read_policy' or args.tool == 'gprp':
     try:
         generate_public_read_policy(args.bucket_name)
         print("public read policy დაგენერირდა")
     except:
         print("public read policy ვერ დაგენერირდა")
-if args.tool == 'read_bucket_policy':
+if args.tool == 'read_bucket_policy' or args.tool == 'rbp':
     read_bucket_policy(s3_client, args.bucket_name)
-if args.tool == 'create_bucket_policy':
+if args.tool == 'create_bucket_policy' or args.tool == 'cbp':
     create_bucket_policy(s3_client, args.bucket_name)
-if args.tool == "download_file_and_upload_to_s3":
+if args.tool == "download_file_and_upload_to_s3" or args.tool == 'du':
     download_file_and_upload_to_s3(s3_client, args.bucket_name, args.url, args.file_name, keep_local=False)
-
-
+if args.tool == "upload" or args.tool == 'u':
+    meme=args.filepath.split('.')[-1]
+    if args.memetype == meme:
+        upload_file(s3_client, args.bucket_name, args.file_name, args.filepath)
+    else:
+        print(f' {meme} გაფართების მქონე ფაილის ატვირთვა არ არის ნებადართული')
+if args.tool == 'lifecycle' or args.tool == 'lc':
+    lifecycle(s3_client , args.bucket_name, args.days)
+if args.tool == 'big_file_upload' or args.tool == 'bfu':
+    meme=args.filepath.split('.')[-1]
+    if args.memetype == meme:
+        big_file_upload(s3_client, args.bucket_name, args.file_name, args.filepath, args.multipart_threshold)
+    else:
+        print(f'{meme} გაფართების მქონე ფაილის ატვირთვა არ არის ნებადართული')

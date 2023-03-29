@@ -1,0 +1,14 @@
+init client : python main.py -t ic or init_client
+list bucket : python main.py -t lb or list_bucket
+create bucket : python main.py -t cb (or create_bucket) -bn(--bucket_name) bucketname
+delete bucket : python main.py -t db (or delete_bucket) -bn(--bucket_name bucketname
+set oject access policy : python main.py -t sap (or set_object_access_policy) -bn(--backetname) bucketname
+check bucket : python main.py -t bc (or bucket_check) -bn(--bucketname) bucketname
+generate public read policy :  python main.py -t gprp (or generate_public_read_policy) -bn(--backetname) bucketname
+read bucket policy : python main.py -t rbp(or read_bucket_policy) -bn(--backetname) bucketname
+create bucket policy : python main.py -t cbp(or create_bucket_policy) -bn(--backetname) bucketname
+download file and upload to s3 : python main.py -t du(download_file_and_upload_to_s3) -bn(--backetname) bucketname -fn(--filename) filename --url link
+upload file to s3 bucket  : python main.py --t u(upload) -bn(--bucket_name) test-avto1 -fn(--file_name) testavto124 -fp(--filepath) filepath
+upload big file to s3 bucket : python main.py -t bfu(big_file_upload) -bn(--bucket_name) bucketname -fn(--file_name) filename -fp(--filepath) filepath
+ -mth(--multipart_threshold) size
+create lifecycle policy : python main.py -t lc(or lifecycle) -bn(--backetname) bucketname -d(--days) number of days
