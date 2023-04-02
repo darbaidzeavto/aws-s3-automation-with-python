@@ -6,6 +6,7 @@ from botocore.exceptions import ClientError
 from boto3.s3.transfer import TransferConfig
 import argparse
 import json
+import magic
 parser = argparse.ArgumentParser()
 parser.add_argument('--bucket_name', "-bn", type=str, help='Name of S3 bucket')
 parser.add_argument('--url', type=str, help='link to download file')
@@ -19,7 +20,7 @@ parser.add_argument('-del', dest='delete', action='store_true', help='Delete the
 parser.add_argument('-vers', dest='versioning', action='store_true', help='check versioning')
 parser.add_argument('-verslist', dest='versionlist', action='store_true', help='version list')
 parser.add_argument('-prevers', dest='previous_version', action='store_true', help='roll back to previous version')
-parser.add_argument('-orgobj', dest='Organize_objects', action='store_true', help='put files in folder according extention type')
+parser.add_argument('-orgobj', dest='organize_objects', action='store_true', help='put files in folder according extention type')
 args = parser.parse_args()
 s3 = boto3.client('s3')
 from hashlib import md5
@@ -245,7 +246,7 @@ def versioning(s3_client, bucket_name):
 def delete_file(s3_client, bucket_name, filename):
     response = s3_client.delete_object(Bucket=args.bucket_name, Key=args.file_name)
     print(f'{args.file_name} ფაილი წაიშალა')
-def Organize_objects(s3_client, bucket_name):
+def organize_objects(s3_client, bucket_name):
     counter = {}
     response = s3_client.list_objects_v2(Bucket=args.bucket_name)
     if response is not None:
@@ -269,7 +270,13 @@ def Organize_objects(s3_client, bucket_name):
     else:
         print('Response is None')
     print(counter)
-    
+def upload_with_magic(s3_client, bucket_name, file_name, filepath):
+    ext = magic.from_file(args.filepath, mime=True).split('/')[-1] + '/' + args.file_name
+    print(ext)
+    with open(args.filepath, 'rb') as f:
+        s3_client.upload_fileobj(f, args.bucket_name, ext)
+        print(f'{args.file_name} წარმატებით აიტვირთა')
+
 
 if __name__ == "__main__":
     s3_client = init_client()
@@ -346,5 +353,7 @@ if args.versionlist == True:
     version_list(s3_client, args.bucket_name, args.file_name)
 if args.previous_version == True:
     previous_version(s3_client, args.bucket_name, args.file_name)
-if args.Organize_objects == True:
-    Organize_objects(s3_client, args.bucket_name)
+if args.organize_objects == True:
+    organize_objects(s3_client, args.bucket_name)
+if args.tool == "upload_with_magic" or args.tool == "uwm":
+    upload_with_magic(s3_client, args.bucket_name, args.file_name, args.filepath)
