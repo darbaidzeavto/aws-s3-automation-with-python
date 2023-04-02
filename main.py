@@ -272,7 +272,6 @@ def organize_objects(s3_client, bucket_name):
     print(counter)
 def upload_with_magic(s3_client, bucket_name, file_name, filepath):
     ext = magic.from_file(args.filepath, mime=True).split('/')[-1] + '/' + args.file_name
-    print(ext)
     with open(args.filepath, 'rb') as f:
         s3_client.upload_fileobj(f, args.bucket_name, ext)
         print(f'{args.file_name} წარმატებით აიტვირთა')
