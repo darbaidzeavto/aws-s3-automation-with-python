@@ -48,8 +48,6 @@ def init_client():
         logging.error(e)
     except:
         logging.error("Unexpected error")
- 
- 
 def list_buckets(s3_client):
     try:
         # https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListBuckets.html
