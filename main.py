@@ -56,8 +56,6 @@ def list_buckets(s3_client):
     except ClientError as e:
         logging.error(e)
         return False
- 
- 
 def create_bucket(s3_client, bucket_name, region=getenv("aws_region_name")):
     # Create bucket
     try:
@@ -74,8 +72,6 @@ def create_bucket(s3_client, bucket_name, region=getenv("aws_region_name")):
     if status_code == 200:
         return True
     return False
- 
- 
 def delete_bucket(s3_client, bucket_name):
     # Delete bucket
     try:
@@ -88,8 +84,6 @@ def delete_bucket(s3_client, bucket_name):
     if status_code == 200:
         return True
     return False
- 
- 
 def bucket_exists(s3_client, bucket_name):
     try:
         response = s3_client.head_bucket(Bucket=args.bucket_name)
@@ -100,8 +94,6 @@ def bucket_exists(s3_client, bucket_name):
     if status_code == 200:
         return True
     return False
- 
- 
 def download_file_and_upload_to_s3(s3_client, bucket_name, url, file_name, keep_local=False):
     from urllib.request import urlopen
     import io
@@ -135,7 +127,6 @@ def download_file_and_upload_to_s3(s3_client, bucket_name, url, file_name, keep_
         bucket_name,
         file_name
     )
- 
 def set_object_access_policy(s3_client, bucket_name, file_name):
     try:
         response = s3_client.put_object_acl(
@@ -150,7 +141,6 @@ def set_object_access_policy(s3_client, bucket_name, file_name):
     if status_code == 200:
         return True
     return False
- 
 def generate_public_read_policy(bucket_name):
     import json
     policy = {
@@ -167,13 +157,11 @@ def generate_public_read_policy(bucket_name):
     }
  
     return json.dumps(policy)
- 
 def create_bucket_policy(s3_client, bucket_name):
     s3_client.put_bucket_policy(
         Bucket=bucket_name, Policy=generate_public_read_policy(args.bucket_name)
     )
     print("Bucket policy შეიქმნა წარმატებით")
- 
 def read_bucket_policy(s3_client, bucket_name):
     try:
         policy = s3_client.get_bucket_policy(Bucket=args.bucket_name)
