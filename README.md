@@ -111,3 +111,8 @@ upload with magic
 upload file with magiclib to put files in folder according extention,run the following command
 python main.py --tool(-t) upload_with_magic(uwm) --bucket_name(-bn) <bucket_name>  --file_name(-fn) <file_name> --filepath(-fp) <filepath>
 Replace <bucket_name> with the name of the bucket you want to upload the file to, <file_name> with the desired name of the file in S3, <filepath> with file path where the file is located
+
+delete old version
+to delete old version of object,run the following command:
+python main.py --tool(-t) delete_old_versions(dov) --bucket_name(-bn) <bucket_name> --file_name(-fn) <file_name> --days(-d) <days>
+Replace <bucket_name> with the name of the bucket, <file_name> with the desired name of the file in S3,<days> with The number of days after which you want to delete files created later

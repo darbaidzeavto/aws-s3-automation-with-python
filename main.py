@@ -7,6 +7,7 @@ from boto3.s3.transfer import TransferConfig
 import argparse
 import json
 import magic
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--bucket_name', "-bn", type=str, help='Name of S3 bucket')
 parser.add_argument('--url', type=str, help='link to download file')
@@ -261,6 +262,24 @@ def upload_with_magic(s3_client, bucket_name, file_name, filepath):
     with open(args.filepath, 'rb') as f:
         s3_client.upload_fileobj(f, args.bucket_name, ext)
         print(f'{args.file_name} წარმატებით აიტვირთა')
+def delete_old_versions(s3_client, bucket_name, file_name, days):
+    from datetime import date
+    from datetime import datetime
+    response = s3_client.list_object_versions(Bucket=args.bucket_name, Prefix=args.file_name)
+    dates = [v['LastModified'] for v in response['Versions']]
+    today = str(date.today())
+    for version in response['Versions']:
+        id = version['VersionId']
+        responses = s3_client.head_object(Bucket=args.bucket_name, Key=args.file_name, VersionId=id)
+        last_modified = responses['LastModified']
+        date = str(last_modified)
+        date = date.split(' ', 1)[0]
+        d2 = datetime.strptime(date, "%Y-%m-%d")
+        d1 = datetime.strptime(today, "%Y-%m-%d")
+        delta = d1 - d2
+        if delta.days > args.days:
+            s3_client.delete_object(Bucket=args.bucket_name, Key=args.file_name, VersionId=id)
+            print(f'ვერსია {id} წაიშალა რადგან {args.days} დღეზე მეტი ხნის წინ შეიქმნა')
 
 
 if __name__ == "__main__":
@@ -342,3 +361,7 @@ if args.organize_objects == True:
     organize_objects(s3_client, args.bucket_name)
 if args.tool == "upload_with_magic" or args.tool == "uwm":
     upload_with_magic(s3_client, args.bucket_name, args.file_name, args.filepath)
+if args.tool == "delete_old_versions" or args.tool == "dov":
+    delete_old_versions(s3_client, args.bucket_name, args.file_name, args.days)
+
+
