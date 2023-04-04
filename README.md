@@ -116,3 +116,8 @@ delete old version
 to delete old version of object,run the following command:
 python main.py --tool(-t) delete_old_versions(dov) --bucket_name(-bn) <bucket_name> --file_name(-fn) <file_name> --days(-d) <days>
 Replace <bucket_name> with the name of the bucket, <file_name> with the desired name of the file in S3,<days> with The number of days after which you want to delete files created later
+
+multipart upload 
+to multipart upload the file,run the following command: 
+python main.py --tool(-t) ufm --bucket_name(-bn) <bucket_name> --file_name(-fn) <filename> --filepath(-fp) <filepath>
+Replace <bucket_name> with the name of the bucket, <file_name> with the desired name of the file in S3, <filepath> with the file path 

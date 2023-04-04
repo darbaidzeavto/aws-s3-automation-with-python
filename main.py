@@ -7,7 +7,15 @@ from boto3.s3.transfer import TransferConfig
 import argparse
 import json
 import magic
-
+import os
+import logging
+import errno
+import sys
+import os
+import threading
+import ntpath
+from pathlib import Path
+from hurry.filesize import size, si
 parser = argparse.ArgumentParser()
 parser.add_argument('--bucket_name', "-bn", type=str, help='Name of S3 bucket')
 parser.add_argument('--url', type=str, help='link to download file')
@@ -280,7 +288,74 @@ def delete_old_versions(s3_client, bucket_name, file_name, days):
         if delta.days > args.days:
             s3_client.delete_object(Bucket=args.bucket_name, Key=args.file_name, VersionId=id)
             print(f'ვერსია {id} წაიშალა რადგან {args.days} დღეზე მეტი ხნის წინ შეიქმნა')
-
+def upload_file_multipart(s3_client, filepath, bucket_name, file_name, metadata=None):
+    MP_THRESHOLD = 1
+    MP_CONCURRENCY = 5
+    MAX_RETRY_COUNT = 3
+    log = logging.getLogger('s3_uploader')
+    log.setLevel(logging.INFO)
+    format = logging.Formatter("%(asctime)s: - %(levelname)s: %(message)s", "%H:%M:%S")
+    stream_handler = logging.StreamHandler(sys.stdout)
+    stream_handler.setFormatter(format)
+    log.addHandler(stream_handler)
+    log.info("Uploading [" + args.filepath + "] to [" + args.bucket_name + "] bucket ...")
+    log.info("S3 path: [ s3://" + args.bucket_name + "/" + args.file_name + " ]")
+    # Multipart transfers occur when the file size exceeds the value of the multipart_threshold attribute
+    if not Path(args.filepath).is_file:
+        log.error("File [" + file + "] does not exist!")
+        raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), file)
+ 
+    if args.file_name is None:
+        log.error("object_path is null!")
+        raise ValueError("S3 object must be set!")
+    
+    
+    GB = 1024 ** 3
+    mp_threshold = MP_THRESHOLD*GB
+    concurrency = MP_CONCURRENCY
+    transfer_config = TransferConfig(multipart_threshold=mp_threshold, use_threads=True, max_concurrency=concurrency)
+ 
+    login_attempt = False
+    retry = MAX_RETRY_COUNT
+     
+    while retry > 0:
+        try:
+            s3_client.upload_file(args.filepath, args.bucket_name, args.file_name, Config=transfer_config, ExtraArgs=metadata)
+            sys.stdout.write('\n')
+            log.info("File [" + args.file_name + "] uploaded successfully")
+            log.info("Object name: [" + args.file_name + "]")
+            retry = 0
+         
+        except ClientError as e:
+            log.error("Failed to upload object!")
+            log.exception(e)
+            if e.response['Error']['Code'] == 'ExpiredToken':
+                log.warning('Login token expired')
+                retry -= 1
+                log.debug("retry = " + str(retry))
+                login_attempt = True
+                login()
+            else:
+                log.error("Unhandled error code:")
+                log.debug(e.response['Error']['Code'])
+                raise
+ 
+        except boto3.exceptions.S3UploadFailedError as e:
+            log.error("Failed to upload object!")
+            log.exception(e)
+            if 'ExpiredToken' in str(e):
+                log.warning('Login token expired')
+                log.info("Handling...")
+                retry -= 1
+                log.debug("retry = " + str(retry))
+                login_attempt = True
+                login()
+            else:
+                log.error("Unknown error!")
+                raise
+ 
+    if login_attempt:
+        raise Exception("Tried to login " + str(MAX_RETRY_COUNT) + " times, but failed to upload!")
 
 if __name__ == "__main__":
     s3_client = init_client()
@@ -363,5 +438,11 @@ if args.tool == "upload_with_magic" or args.tool == "uwm":
     upload_with_magic(s3_client, args.bucket_name, args.file_name, args.filepath)
 if args.tool == "delete_old_versions" or args.tool == "dov":
     delete_old_versions(s3_client, args.bucket_name, args.file_name, args.days)
-
+if args.tool == "upload_file_multipart" or args.tool == "ufm":
+    name = args.filepath.split('/')[-1]
+    type = args.filepath.split('.')[-1]
+    size = os.path.getsize(args.filepath)/(1024 ** 3)
+    metadata = {}
+    metadata['Metadata'] = {'name': name, 'type': type,'size': f'{size}GB'}
+    upload_file_multipart(s3_client, args.filepath, args.bucket_name, args.file_name, metadata=metadata)
 
