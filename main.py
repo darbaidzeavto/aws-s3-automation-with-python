@@ -356,9 +356,19 @@ def upload_file_multipart(s3_client, filepath, bucket_name, file_name, metadata=
  
     if login_attempt:
         raise Exception("Tried to login " + str(MAX_RETRY_COUNT) + " times, but failed to upload!")
-
+def static_website(s3_cient, bucket_name):
+    with open(args.filepath, 'rb') as f:
+        s3_cient.upload_fileobj(f, args.bucket_name, args.file_name, ExtraArgs={'ContentType': 'text/html'})
+    website_configuration = {
+    'ErrorDocument': {'Key': 'error.html'},
+    'IndexDocument': {'Suffix': 'index.html'},
+    }
+    s3_client.put_bucket_website(Bucket=args.bucket_name ,WebsiteConfiguration=website_configuration)
+    print("სტატიკური ვებსაიტი დაიჰოსტა წარმატებით")
 if __name__ == "__main__":
     s3_client = init_client()
+
+    
 if args.tool == 'init_client' or args.tool == 'ic':
     init_client()
 if args.tool == 'list_bucket' or args.tool == 'lb':
@@ -445,4 +455,6 @@ if args.tool == "upload_file_multipart" or args.tool == "ufm":
     metadata = {}
     metadata['Metadata'] = {'name': name, 'type': type,'size': f'{size}GB'}
     upload_file_multipart(s3_client, args.filepath, args.bucket_name, args.file_name, metadata=metadata)
+if args.tool == "static_website" or args.tool == "sw":
+    static_website(s3_client, args.bucket_name)
 

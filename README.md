@@ -121,3 +121,8 @@ multipart upload
 to multipart upload the file,run the following command: 
 python main.py --tool(-t) ufm --bucket_name(-bn) <bucket_name> --file_name(-fn) <filename> --filepath(-fp) <filepath>
 Replace <bucket_name> with the name of the bucket, <file_name> with the desired name of the file in S3, <filepath> with the file path 
+
+static website
+to host statis website, run the following command: 
+python main.py -tool(-t) static_website(sw) --bucket_name(-bn) <bucket_name> --file_name(-fn) index.html --filepath(-fp) <filepath>
+Replace <bucket_name> with the name of the bucket, <filepath> with the file path
