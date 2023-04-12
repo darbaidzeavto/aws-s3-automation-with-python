@@ -390,6 +390,7 @@ def upload_and_host(s3_client, bucket_name, filepath):
 
     if not region:
         region = 'us-east-1'
+    print(f'http://{args.bucket_name}.s3-website-{region}.amazonaws.com')
 def analytics(data):
   stats = {"quotes": 0}
   for index, each in enumerate(data):
@@ -428,7 +429,7 @@ def main():
                         print(f'quotes.json აიტვირთა {args.bucket_name} ბაკეტში')
                 break
 
-    print(f'http://{args.bucket_name}.s3-website-{region}.amazonaws.com')
+  
 if __name__ == "__main__":
     s3_client = init_client()
 
@@ -523,7 +524,7 @@ if args.tool == "static_website" or args.tool == "sw":
     static_website(s3_client, args.bucket_name)
 if args.tool == upload_and_host or args.tool == "uh":
     upload_and_host(s3_client, args.bucket_name, args.filepath)
-if args.inspire == "true" or args.inspire is not None:
+if args.inspire is not None:
     main()
 
 
