@@ -16,6 +16,8 @@ import threading
 import ntpath
 from pathlib import Path
 from hurry.filesize import size, si
+from urllib.request import urlopen, Request
+from random import choice
 parser = argparse.ArgumentParser()
 parser.add_argument('--bucket_name', "-bn", type=str, help='Name of S3 bucket')
 parser.add_argument('--url', type=str, help='link to download file')
@@ -30,6 +32,8 @@ parser.add_argument('-vers', dest='versioning', action='store_true', help='check
 parser.add_argument('-verslist', dest='versionlist', action='store_true', help='version list')
 parser.add_argument('-prevers', dest='previous_version', action='store_true', help='roll back to previous version')
 parser.add_argument('-orgobj', dest='organize_objects', action='store_true', help='put files in folder according extention type')
+parser.add_argument('--inspire', nargs='?', const='true', help='Quote from api' )
+parser.add_argument('-save', action='store_true' )
 args = parser.parse_args()
 s3 = boto3.client('s3')
 from hashlib import md5
@@ -365,6 +369,29 @@ def static_website(s3_cient, bucket_name):
     }
     s3_client.put_bucket_website(Bucket=args.bucket_name ,WebsiteConfiguration=website_configuration)
     print("სტატიკური ვებსაიტი დაიჰოსტა წარმატებით")
+def upload_and_host(s3_client, bucket_name, filepath):
+    create_bucket_policy(s3_client, args.bucket_name)
+    local_folder_path = args.filepath
+    for root, dirs, files in os.walk(local_folder_path):
+        for file in files:
+            local_file_path = os.path.join(root, file)
+            # Use relative path for S3 key, e.g. folder/subfolder/file.txt
+            s3_key = os.path.relpath(local_file_path, local_folder_path).replace('\\', '/')
+            s3_client.upload_file(local_file_path, args.bucket_name, s3_key, ExtraArgs={'ContentType': 'text/html'})
+                
+    website_configuration = {
+        'ErrorDocument': {'Key': 'error.html'},
+        'IndexDocument': {'Suffix': 'index.html'},
+        }
+    s3_client.put_bucket_website(Bucket=args.bucket_name, WebsiteConfiguration=website_configuration)
+    response = s3_client.get_bucket_location(Bucket=args.bucket_name)
+
+    region = response['LocationConstraint']
+
+    if not region:
+        region = 'us-east-1'
+
+    print(f'http://{args.bucket_name}.s3-website-{region}.amazonaws.com')
 if __name__ == "__main__":
     s3_client = init_client()
 
@@ -457,4 +484,51 @@ if args.tool == "upload_file_multipart" or args.tool == "ufm":
     upload_file_multipart(s3_client, args.filepath, args.bucket_name, args.file_name, metadata=metadata)
 if args.tool == "static_website" or args.tool == "sw":
     static_website(s3_client, args.bucket_name)
+if args.tool == upload_and_host or args.tool == "uh":
+    upload_and_host(s3_client, args.bucket_name, args.filepath)
+
+def analytics(data):
+  stats = {"quotes": 0}
+  for index, each in enumerate(data):
+
+    if not stats.get(each["author"]):
+      stats[each["author"]] = {"quote_index": [index], "quotes_avaliable": 1}
+    else:
+      stats[each["author"]]['quote_index'].append(index)
+      stats[each["author"]]['quotes_avaliable'] += 1
+    stats['quotes'] += 1
+
+  return stats
+def main():
+  headers = {
+  'user-agent':
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36',
+   }
+  json_result = []
+  with urlopen(
+      Request("https://type.fit/api/quotes", data=None,
+              headers=headers)) as response:
+    json_result = json.loads(response.read().decode())
+    if args.inspire == "true":
+        print(json.dumps(choice(json_result)["text"], indent=4))
+    else:
+        json_string = json.dumps(json_result)
+        list_of_quotes = json.loads(json_string)
+        for quote in list_of_quotes:
+            if quote["author"] == args.inspire:
+                print(quote["text"])
+                if args.save == True:
+                    with open("quotes.json", "w") as f:
+                        json.dump(quote, f)
+                    with open("quotes.json", "rb") as f:
+                        s3_client.upload_fileobj(f, args.bucket_name, "quotes.json")
+                        print(f'quotes.json აიტვირთა {args.bucket_name} ბაკეტში')
+                break
+
+        
+    
+
+if args.inspire == "true" or args.inspire is not None:
+    main()
+
 
